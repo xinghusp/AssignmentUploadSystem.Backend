@@ -1,3 +1,4 @@
+from numbers import Number
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -78,15 +79,15 @@ def upload_assignment():
     return jsonify({'data': 'Upload successful','success':True}), 200
 
 
-@app.route('/assignments', methods=['GET'])
-def list_assignments():
+@app.route('/assignments/<int:class_id>', methods=['GET'])
+def list_assignments(class_id):
     with sqlite3.connect(DATABASE) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, group_id, video_title FROM Assignments")
+        cursor.execute("SELECT a.id, group_id, video_title,video_file,g.name as group_name,c.name as class_name FROM Assignments AS a JOIN (SELECT id,name,class_id FROM `Groups`) AS g JOIN (SELECT * FROM Classes) AS c ON a.group_id=g.id AND g.class_id=c.id WHERE c.id=?", (class_id,))
         assignments = cursor.fetchall()
 
     # 将结果转换为字典列表
-    assignment_list = [{"id": row[0], "group_id": row[1], "video_title": row[2]} for row in assignments]
+    assignment_list = [{"id": row[0], "group_id": row[1], "video_title": row[2],"video_file": row[3],"group_name":row[4],"class_name":row[5]} for row in assignments]
 
     return jsonify(assignment_list), 200
 
@@ -139,13 +140,28 @@ def is_uploaded(group_id):
 
 @app.route('/grade', methods=['POST'])
 def grade_assignment():
-    data = request.json
+    data = request.form
     assignment_id = data.get('assignment_id')
-    scores = data.get('scores', {})
+    language_score = data.get('languageScore')
+    technical_score = data.get('technicalScore')
+    creativity_score = data.get('creativityScore')
+    teamwork_score = data.get('teamworkScore')
 
-    if not assignment_id or not all(
-            k in scores for k in ['language_score', 'technical_score', 'creativity_score', 'teamwork_score']):
+    if not assignment_id or not language_score or not teamwork_score or not technical_score or not creativity_score:
         return jsonify({'data': 'Invalid data provided','success':False}), 200
+    language_score = float(language_score)
+    teamwork_score = float(teamwork_score)
+    creativity_score = float(creativity_score)
+    technical_score = float(technical_score)
+
+    if language_score < 0 or language_score > 30:
+        return jsonify({'data': 'Invalid language score provided','success':False}), 200
+    if technical_score < 0 or technical_score > 30:
+        return jsonify({'data': 'Invalid technical score provided','success':False}), 200
+    if creativity_score < 0 or creativity_score > 20:
+        return jsonify({'data': 'Invalid creativity score provided','success':False}), 200
+    if teamwork_score < 0 or teamwork_score > 20:
+        return jsonify({'data': 'Invalid teamwork score provided','success':False}), 200
 
     with sqlite3.connect(DATABASE) as conn:
         conn.execute(
@@ -153,15 +169,28 @@ def grade_assignment():
             VALUES (?, ?, ?, ?, ?)""",
             (
                 assignment_id,
-                scores['language_score'],
-                scores['technical_score'],
-                scores['creativity_score'],
-                scores['teamwork_score']
+                language_score,
+                technical_score,
+                creativity_score,
+                teamwork_score
             )
         )
         conn.commit()
 
-    return jsonify({'data': 'Grade submitted successfully','success':False}), 200
+    return jsonify({'data': 'Grade submitted successfully','success':True}), 200
+
+@app.route('/get_current_avg_score/<int:assignment_id>', methods=['GET'])
+def get_current_avg_score(assignment_id):
+    #get all score records from database by assignment_id
+    with sqlite3.connect(DATABASE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT language_score, technical_score, creativity_score, teamwork_score FROM Grades WHERE assignment_id = ?", (assignment_id,))
+        scores = cursor.fetchall()
+        # iterate all records,calculate total_score by add language_score,technical_score,creativity_score,teamwork_score.then calculate the average for total_score
+        total_score = sum([sum(score) for score in scores])
+        avg_score = total_score / len(scores)
+        return str(avg_score)
+
 
 # 生成上传签名
 def generate_oss_signature():

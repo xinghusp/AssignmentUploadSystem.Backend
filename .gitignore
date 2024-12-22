@@ -1,0 +1,44 @@
+# Python 编译文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE 和编辑器文件
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.swp
+*.swo
+
+# 虚拟环境
+venv/
+env/
+.venv/
+env.bak/
+venv.bak/
+
+# 包管理器文件
+*.egg-info/
+dist/
+build/
+*.egg
+
+# 操作系统生成的文件
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 环境变量文件
+.env
+
+uploads/
+database/assignment_system.db
